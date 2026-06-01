@@ -51,7 +51,7 @@ testing:
     unit:
       available: true
       tool: "go test"
-      note: "132 test files across internal/ packages"
+      note: "152 test files across internal/ packages"
     integration:
       available: true
       tool: "net/http/httptest (built-in)"
