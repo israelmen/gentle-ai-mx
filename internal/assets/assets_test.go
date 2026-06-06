@@ -887,3 +887,74 @@ func TestSDDOrchestratorAssetsScopedToDedicatedAgent(t *testing.T) {
 		})
 	}
 }
+
+// TestOpenCodeSDDOrchestratorHasGroupE verifies that the OpenCode SDD
+// orchestrator asset contains the Group E (Issue Tracking) preflight block in
+// both English and Spanish, with canonical option codes and values.
+// This test is part of the issue-tracking-preflight change.
+func TestOpenCodeSDDOrchestratorHasGroupE(t *testing.T) {
+	content := MustRead("opencode/sdd-orchestrator.md")
+
+	for _, required := range []string{
+		// English block
+		"E. Issue Tracking",
+		"E1 None (recommended): no ticket integration.",
+		"E2 GitHub: create/update GitHub issues.",
+		"E3 Jira: create/update Jira tickets.",
+		"E4 Both: GitHub issues and Jira tickets.",
+		// Spanish block
+		"E. Seguimiento",
+		"E1 Ninguno (recomendado): sin integración de tickets.",
+		"E2 GitHub: crear/actualizar issues en GitHub.",
+		"E3 Jira: crear/actualizar tickets en Jira.",
+		"E4 Ambos: issues en GitHub y tickets en Jira.",
+		// Canonical value mapping
+		"E1/None", "issue_tracking",
+		// Routing rules
+		"Issue Tracking Routing",
+		"sdd-po",
+		"analyze-ticket",
+		"post-apply-report",
+		// Updated A1, B1, C1, D1, E1 pattern
+		"A1, B1, C1, D1, E1",
+	} {
+		if !strings.Contains(content, required) {
+			t.Fatalf("opencode/sdd-orchestrator.md missing issue-tracking Group E content %q", required)
+		}
+	}
+}
+
+// TestNonOpenCodeOrchestratorsHaveIssueTrackingQuestion verifies that all
+// non-OpenCode platform orchestrators ask the issue tracking question after
+// delivery strategy and define routing rules for sdd-po.
+// This test is part of the issue-tracking-preflight change.
+func TestNonOpenCodeOrchestratorsHaveIssueTrackingQuestion(t *testing.T) {
+	paths := []string{
+		"claude/sdd-orchestrator.md",
+		"cursor/sdd-orchestrator.md",
+		"gemini/sdd-orchestrator.md",
+		"codex/sdd-orchestrator.md",
+		"antigravity/sdd-orchestrator.md",
+		"generic/sdd-orchestrator.md",
+		"windsurf/sdd-orchestrator.md",
+		"qwen/sdd-orchestrator.md",
+		"kiro/sdd-orchestrator.md",
+		"kimi/sdd-orchestrator.md",
+	}
+
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			content := MustRead(path)
+			for _, required := range []string{
+				"Issue Tracking",
+				"issue_tracking",
+				"jira",
+				"github",
+			} {
+				if !strings.Contains(content, required) {
+					t.Fatalf("%s missing issue-tracking question/routing content %q", path, required)
+				}
+			}
+		})
+	}
+}

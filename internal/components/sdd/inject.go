@@ -828,9 +828,9 @@ func ensurePreservedOpenCodeOrchestratorPreflight(prompt string) string {
 
 Before executing ANY SDD command or natural-language SDD request, ensure this session has an explicit ` + "`SDD Session Preflight`" + ` decision block.
 
-Required preflight choices: execution mode, artifact store, chained PR strategy, and review budget.
+Required preflight choices: execution mode, artifact store, chained PR strategy, review budget, and issue tracking.
 
-Ask the user directly with a compact, numbered preflight prompt. Match the user's current language for all user-facing prose. If the user writes Spanish, ask the preflight in Spanish. Keep option codes (` + "`A1`" + `, ` + "`B1`" + `, ` + "`C1`" + `, ` + "`D1`" + `) and canonical values unchanged. Do NOT ask the user to type raw keys like ` + "`execution mode`" + `, ` + "`artifact store`" + `, ` + "`chained PR strategy`" + `, or ` + "`review budget`" + `. Do NOT mention non-existent tools. Do NOT invent informal values; use only the canonical values after the user chooses.
+Ask the user directly with a compact, numbered preflight prompt. Match the user's current language for all user-facing prose. If the user writes Spanish, ask the preflight in Spanish. Keep option codes (` + "`A1`" + `, ` + "`B1`" + `, ` + "`C1`" + `, ` + "`D1`" + `, ` + "`E1`" + `) and canonical values unchanged. Do NOT ask the user to type raw keys like ` + "`execution mode`" + `, ` + "`artifact store`" + `, ` + "`chained PR strategy`" + `, or ` + "`review budget`" + `. Do NOT mention non-existent tools. Do NOT invent informal values; use only the canonical values after the user chooses.
 
 Do NOT mix languages inside one preflight prompt: headings, option titles, descriptions, and follow-up text must all be in the user's current language. If the current language is Spanish, use the Spanish localized shape below verbatim; do not translate only the intro while keeping English labels like ` + "`Pace`" + `, ` + "`Artifacts`" + `, ` + "`Review`" + `, ` + "`recommended`" + `, ` + "`forecast`" + `, or ` + "`budget`" + `.
 
@@ -838,7 +838,7 @@ Use this shape for English users, or translate user-facing prose to the user's c
 
 ` + "```text" + `
 Before continuing with SDD, choose one option per group.
-Reply with "use recommended" or with codes like: A1, B1, C1, D1.
+Reply with "use recommended" or with codes like: A1, B1, C1, D1, E1.
 
 A. Pace
    A1 Interactive (recommended): show each phase and wait for confirmation before continuing.
@@ -859,6 +859,12 @@ D. Review
    D1 400 lines (recommended): stop if forecast exceeds 400 changed lines.
    D2 800 lines: more permissive; useful for medium changes.
    D3 Other: ask for the number afterwards.
+
+E. Issue Tracking
+   E1 None (recommended): no ticket integration.
+   E2 GitHub: create/update GitHub issues.
+   E3 Jira: create/update Jira tickets.
+   E4 Both: GitHub issues and Jira tickets.
 ` + "```" + `
 
 After asking this, STOP and wait for the user's answer.
@@ -867,7 +873,7 @@ If the user's current language is Spanish, use this localized shape:
 
 ` + "```text" + `
 Antes de continuar con SDD, elegí una opción por grupo.
-Respondé con "usar recomendado" o con códigos como: A1, B1, C1, D1.
+Respondé con "usar recomendado" o con códigos como: A1, B1, C1, D1, E1.
 
 A. Ritmo
    A1 Interactivo (recomendado): mostrar cada fase y esperar confirmación antes de continuar.
@@ -888,9 +894,15 @@ D. Revisión
    D1 400 líneas (recomendado): frenar si la estimación supera 400 líneas cambiadas.
    D2 800 líneas: más permisivo; útil para cambios medianos.
    D3 Otro: preguntar el número después.
+
+E. Seguimiento
+   E1 Ninguno (recomendado): sin integración de tickets.
+   E2 GitHub: crear/actualizar issues en GitHub.
+   E3 Jira: crear/actualizar tickets en Jira.
+   E4 Ambos: issues en GitHub y tickets en Jira.
 ` + "```" + `
 
-Map answers to canonical values: A1/Interactive -> ` + "`interactive`" + `; A2/Automatic -> ` + "`auto`" + `; B1/OpenSpec -> ` + "`openspec`" + `; B2/Engram -> ` + "`engram`" + `; B3/Both -> ` + "`both`" + `; C1/Ask me -> ` + "`ask-always`" + `; C2/Single PR -> ` + "`single-pr-default`" + `; C3/Chained -> ` + "`force-chained`" + `; C4/Auto -> ` + "`auto-forecast`" + `; D1/400 lines -> ` + "`review_budget_lines: 400`" + `; D2/800 lines -> ` + "`review_budget_lines: 800`" + `; D3/Other -> ask one follow-up for the number.
+Map answers to canonical values: A1/Interactive -> ` + "`interactive`" + `; A2/Automatic -> ` + "`auto`" + `; B1/OpenSpec -> ` + "`openspec`" + `; B2/Engram -> ` + "`engram`" + `; B3/Both -> ` + "`both`" + `; C1/Ask me -> ` + "`ask-always`" + `; C2/Single PR -> ` + "`single-pr-default`" + `; C3/Chained -> ` + "`force-chained`" + `; C4/Auto -> ` + "`auto-forecast`" + `; D1/400 lines -> ` + "`review_budget_lines: 400`" + `; D2/800 lines -> ` + "`review_budget_lines: 800`" + `; D3/Other -> ask one follow-up for the number; E1/None -> ` + "`issue_tracking: none`" + `; E2/GitHub -> ` + "`issue_tracking: github`" + `; E3/Jira -> ` + "`issue_tracking: jira`" + `; E4/Both -> ` + "`issue_tracking: both`" + `.
 
 Hard gate rules:
 
@@ -909,6 +921,7 @@ Hard gate rules:
 		strings.Contains(prompt, "If the current language is Spanish, use the Spanish localized shape below verbatim") &&
 		strings.Contains(prompt, "pause after each delegated phase returns") &&
 		strings.Contains(prompt, "Before continuing with SDD") &&
+		strings.Contains(prompt, "E. Issue Tracking") &&
 		!strings.Contains(prompt, "question` tool") {
 		return prompt
 	}

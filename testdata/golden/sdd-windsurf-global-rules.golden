@@ -167,6 +167,17 @@ Automatic mode does not override this guard. Always include the resolved `delive
 
 When executing the inline `sdd-apply` phase, always include the resolved `delivery_strategy`, `chain_strategy`, and any chosen PR boundary/exception in the phase context.
 
+### Issue Tracking
+
+On the first `/sdd-new`, `/sdd-ff`, or `/sdd-continue` in a session, ask once for and cache the issue tracking preference:
+
+- **`none`** (default): No ticket integration. Skip all `sdd-po` invocations.
+- **`github`**: Before `sdd-propose`, enrich from a GitHub issue if one was provided (`analyze-ticket` mode). After `sdd-apply`, post test results back to the issue (`post-apply-report` mode). After `sdd-archive`, update issue status (`lifecycle-update` mode).
+- **`jira`**: Before `sdd-propose`, enrich from a Jira ticket if one was provided (`analyze-ticket` mode). After `sdd-apply`, post test results back to the ticket (`post-apply-report` mode). After `sdd-archive`, update ticket status (`lifecycle-update` mode).
+- **`both`**: Apply both `github` and `jira` routing above.
+
+Cache as `issue_tracking` for the session. Pass it to `sdd-po` when delegating issue enrichment or reporting.
+
 <!-- gentle-ai:sdd-model-assignments -->
 ## Model Assignments
 

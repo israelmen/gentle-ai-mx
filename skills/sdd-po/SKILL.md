@@ -32,9 +32,10 @@ You are a Product Owner persona. You bridge Jira ticket management and the SDD w
 
 From the orchestrator:
 - Change name (e.g., "add-dark-mode")
-- Mode: `jira-first` (ticket key provided) or `sdd-first` (proposal output provided)
-- Ticket key (Jira-first) OR proposal output (SDD-first)
+- Mode: `jira-first` (ticket key provided), `sdd-first` (proposal output provided), `analyze-ticket` (pre-propose enrichment), or `post-apply-report` (test results → Jira)
+- Ticket key (Jira-first / analyze-ticket) OR proposal output (SDD-first) OR change name (post-apply-report)
 - Artifact store mode (`engram | openspec | hybrid | none`)
+- `issue_tracking` value (from session preflight: `none | github | jira | both`)
 
 ---
 
@@ -144,6 +145,138 @@ Fire-and-forget updates to the Jira ticket as SDD phases complete. Always fetch 
 
 {details — task list, files changed, verification results, etc.}
 ```
+
+---
+
+## D. Pre-Propose Ticket Enrichment (analyze-ticket mode)
+
+This mode runs BEFORE `sdd-propose` when `issue_tracking` is `jira` or `both`.
+
+### Input
+
+- `ticket_key`: Jira ticket key (e.g., `MXSAT-123`)
+- `artifact_store.mode`: from session preflight
+
+### Process
+
+1. Read the Jira ticket via the Jira skill (view operation)
+2. Evaluate completeness:
+   - **Description**: ✓ if present and non-trivial | ✗ if empty or one-liner
+   - **Acceptance Criteria**: ✓ if present and testable | ✗ if absent
+   - **Scope**: ✓ if bounded and clear | ✗ if vague or unbounded
+3. If any dimension is ✗ (incomplete):
+   - ADD structured data to the ticket (ADDITIVE ONLY — never overwrite existing content)
+   - Format additions as a new "SDD Enrichment" section appended to the description
+4. Output enriched requirement context as markdown for `sdd-propose`
+
+### Enrichment Rules
+
+- NEVER overwrite existing ticket content
+- ONLY append a new `## SDD Enrichment` section
+- If all dimensions are ✓, skip enrichment and output structured context as-is
+- Output MUST include completeness scores and structured requirements
+
+### Output Format
+
+```markdown
+## Ticket Enrichment Summary
+
+**Ticket**: {key} — {title}
+**Completeness**: Description {✓/✗} | Acceptance Criteria {✓/✗} | Scope {✓/✗}
+
+### Structured Requirements
+{extracted/inferred requirements from ticket content}
+
+### Gaps Identified
+{list of missing information that sdd-propose should fill}
+```
+
+---
+
+## E. Post-Apply Test Report (post-apply-report mode)
+
+This mode runs AFTER `sdd-apply` when `issue_tracking` is `jira` or `both`.
+
+### Input
+
+- `change_name`: name of the SDD change (used to find apply-progress artifact)
+- `artifact_store.mode`: from session preflight
+
+### Process
+
+1. Read the apply-progress artifact:
+   - `engram`: `mem_search(query: "sdd/{change-name}/apply-progress")` → `mem_get_observation(id)`
+   - `openspec`: read `openspec/changes/{change-name}/apply-progress.md`
+   - `hybrid`: Engram first, filesystem fallback
+2. Extract test data:
+   - Pass/fail counts
+   - Test names and statuses
+   - Coverage percentage (if available)
+   - Files changed summary
+3. Format test report table (see format below)
+4. Update Jira ticket "Technical Solution" section with the formatted report
+
+### Graceful Degradation
+
+If apply-progress is missing or has unrecognized format:
+- Log warning: "Test data not available for this apply batch"
+- Update Jira ticket with note: "Test results unavailable — apply-progress artifact not found or unrecognized format"
+- Do NOT block or fail the pipeline
+
+### Report Format
+
+```markdown
+## Technical Solution — SDD Apply Report
+
+**Change**: {change-name}
+**Apply Batch**: {date}
+
+### Test Results
+
+| Status | Count |
+|--------|-------|
+| ✅ Pass | {N} |
+| ❌ Fail | {N} |
+| Coverage | {N}% (if available) |
+
+### Tests Run
+
+| Test | Status |
+|------|--------|
+| {test name} | ✅ Pass / ❌ Fail |
+
+### Files Changed
+
+| File | Action |
+|------|--------|
+| {path} | Created / Modified |
+```
+
+---
+
+## F. Lifecycle Update Mode (`lifecycle-update`)
+
+Triggered by the orchestrator after `sdd-archive` when `issue_tracking` is `jira` or `both`.
+
+### When to Run
+
+The orchestrator delegates to `sdd-po` with `mode: lifecycle-update` after a successful archive phase.
+
+### What to Do
+
+1. Read the archive report from the active artifact store
+2. Update the Jira ticket (or GitHub issue, depending on `issue_tracking`) with:
+   - Final implementation status (from archive report)
+   - Link to the merged PR (if available)
+   - Summary of what was delivered vs. original acceptance criteria
+3. Transition the ticket status if the Jira workflow allows it (e.g., move to "Done" or "Deployed")
+
+### Rules
+
+- NEVER overwrite existing ticket content — APPEND a "Delivery Summary" section
+- If the archive report is missing or incomplete, add a note indicating partial delivery and skip status transition
+- If ticket transition fails (permissions, workflow rules), log the failure and continue — do not block the archive
+- Keep the update concise: 3-5 bullet points maximum
 
 ---
 

@@ -4955,3 +4955,126 @@ func TestEnsureClaudeSkillRegistryHookRejectsUnexpectedHookSchema(t *testing.T) 
 		t.Fatalf("settings were modified: %q", after)
 	}
 }
+
+// TestEnsurePreservedPreflightAppendsGroupE verifies that a preserved prompt
+// whose preflight block includes only groups A–D (no E) gets Group E appended
+// during migration. This tests the RED phase for the issue-tracking-preflight
+// change — the function must detect missing Group E and add it.
+func TestEnsurePreservedPreflightAppendsGroupE(t *testing.T) {
+	// Construct a prompt that has the full A-D preflight block but no Group E.
+	// Use enough of the required guard strings so the existing guard PASSES
+	// (prompt is considered "current") and only the E-group is missing.
+	promptWithoutE := `# Gentle AI
+
+### SDD Session Preflight (HARD GATE)
+
+Before executing ANY SDD command or natural-language SDD request, ensure this session has an explicit ` + "`SDD Session Preflight`" + ` decision block.
+
+openspec/config.yaml and installed SDD assets do NOT satisfy session preflight.
+
+Never launch ` + "`sdd-apply`" + ` just because the user asked to implement a feature.
+
+Match the user's current language for all user-facing prose.
+
+Do NOT mix languages inside one preflight prompt.
+
+If the current language is Spanish, use the Spanish localized shape below verbatim.
+
+pause after each delegated phase returns.
+
+Before continuing with SDD, choose one option per group.
+Reply with "use recommended" or with codes like: A1, B1, C1, D1.
+
+A. Pace
+   A1 Interactive (recommended).
+   A2 Automatic.
+
+B. Artifacts
+   B1 OpenSpec.
+
+C. PRs
+   C1 Ask me.
+
+D. Review
+   D1 400 lines.
+
+Antes de continuar con SDD, elegí una opción por grupo.
+
+ask the localized user-facing preflight prompt above and STOP
+`
+
+	result := ensurePreservedOpenCodeOrchestratorPreflight(promptWithoutE)
+
+	if !strings.Contains(result, "E. Issue Tracking") {
+		t.Fatal("ensurePreservedOpenCodeOrchestratorPreflight: Group E missing from English block after migration")
+	}
+	if !strings.Contains(result, "E1 None (recommended)") {
+		t.Fatal("ensurePreservedOpenCodeOrchestratorPreflight: E1 option missing after migration")
+	}
+	if !strings.Contains(result, "E2 GitHub") {
+		t.Fatal("ensurePreservedOpenCodeOrchestratorPreflight: E2 option missing after migration")
+	}
+	if !strings.Contains(result, "E3 Jira") {
+		t.Fatal("ensurePreservedOpenCodeOrchestratorPreflight: E3 option missing after migration")
+	}
+	if !strings.Contains(result, "E4 Both") {
+		t.Fatal("ensurePreservedOpenCodeOrchestratorPreflight: E4 option missing after migration")
+	}
+	if !strings.Contains(result, "E. Seguimiento") {
+		t.Fatal("ensurePreservedOpenCodeOrchestratorPreflight: Spanish Group E missing after migration")
+	}
+	if !strings.Contains(result, "E1 Ninguno") {
+		t.Fatal("ensurePreservedOpenCodeOrchestratorPreflight: Spanish E1 option missing after migration")
+	}
+	if !strings.Contains(result, "issue_tracking") {
+		t.Fatal("ensurePreservedOpenCodeOrchestratorPreflight: issue_tracking canonical value mapping missing after migration")
+	}
+}
+
+// TestEnsurePreservedPreflightNoOpWhenGroupEPresent verifies that a prompt
+// already containing Group E is NOT modified — the migration must be idempotent.
+func TestEnsurePreservedPreflightNoOpWhenGroupEPresent(t *testing.T) {
+	// Construct a prompt that already has ALL guard strings AND Group E.
+	promptWithE := `# Gentle AI
+
+### SDD Session Preflight (HARD GATE)
+
+Before executing ANY SDD command or natural-language SDD request, ensure this session has an explicit ` + "`SDD Session Preflight`" + ` decision block.
+
+openspec/config.yaml and installed SDD assets do NOT satisfy session preflight.
+
+Never launch ` + "`sdd-apply`" + ` just because the user asked to implement a feature.
+
+Match the user's current language for all user-facing prose.
+
+Do NOT mix languages inside one preflight prompt.
+
+If the current language is Spanish, use the Spanish localized shape below verbatim.
+
+pause after each delegated phase returns.
+
+Before continuing with SDD, choose one option per group.
+
+E. Issue Tracking
+   E1 None (recommended): no ticket integration.
+   E2 GitHub: create/update GitHub issues.
+   E3 Jira: create/update Jira tickets.
+   E4 Both: GitHub issues and Jira tickets.
+
+E. Seguimiento
+   E1 Ninguno (recomendado): sin integración de tickets.
+
+issue_tracking: none
+
+ask the localized user-facing preflight prompt above and STOP
+`
+
+	result := ensurePreservedOpenCodeOrchestratorPreflight(promptWithE)
+
+	// The function should return the prompt unchanged (or with only normalizations).
+	// The key invariant: no duplication of Group E.
+	groupECount := strings.Count(result, "E. Issue Tracking")
+	if groupECount != 1 {
+		t.Fatalf("ensurePreservedOpenCodeOrchestratorPreflight: Group E appears %d times, want exactly 1", groupECount)
+	}
+}

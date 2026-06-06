@@ -91,10 +91,11 @@ Required preflight choices:
 2. **Artifact store**: `openspec`, `engram`, or `both` when Engram is callable. If Engram is unavailable, offer only file/inline-safe choices.
 3. **Chained PR strategy**: `auto-forecast`, `ask-always`, `single-pr-default`, or `force-chained`.
 4. **Review budget**: maximum changed lines before stopping for reviewer-burden approval.
+5. **Issue tracking**: `none`, `github`, `jira`, or `both`.
 
 User-facing preflight question format:
 
-Ask the user directly with a compact, numbered preflight prompt. Match the user's current language for all user-facing prose. If the user writes Spanish, ask the preflight in Spanish. Keep option codes (`A1`, `B1`, `C1`, `D1`) and canonical values unchanged. Do NOT ask the user to type raw keys like `execution mode`, `artifact store`, `chained PR strategy`, or `review budget`. Do NOT mention non-existent tools. Do NOT invent informal values; use only the canonical values after the user chooses.
+Ask the user directly with a compact, numbered preflight prompt. Match the user's current language for all user-facing prose. If the user writes Spanish, ask the preflight in Spanish. Keep option codes (`A1`, `B1`, `C1`, `D1`, `E1`) and canonical values unchanged. Do NOT ask the user to type raw keys like `execution mode`, `artifact store`, `chained PR strategy`, or `review budget`. Do NOT mention non-existent tools. Do NOT invent informal values; use only the canonical values after the user chooses.
 
 Do NOT mix languages inside one preflight prompt: headings, option titles, descriptions, and follow-up text must all be in the user's current language. If the current language is Spanish, use the Spanish localized shape below verbatim; do not translate only the intro while keeping English labels like `Pace`, `Artifacts`, `Review`, `recommended`, `forecast`, or `budget`.
 
@@ -102,7 +103,7 @@ Use this shape for English users, or translate user-facing prose to the user's c
 
 ```text
 Before continuing with SDD, choose one option per group.
-Reply with "use recommended" or with codes like: A1, B1, C1, D1.
+Reply with "use recommended" or with codes like: A1, B1, C1, D1, E1.
 
 A. Pace
    A1 Interactive (recommended): show each phase and wait for confirmation before continuing.
@@ -123,6 +124,12 @@ D. Review
    D1 400 lines (recommended): stop if forecast exceeds 400 changed lines.
    D2 800 lines: more permissive; useful for medium changes.
    D3 Other: ask for the number afterwards.
+
+E. Issue Tracking
+   E1 None (recommended): no ticket integration.
+   E2 GitHub: create/update GitHub issues.
+   E3 Jira: create/update Jira tickets.
+   E4 Both: GitHub issues and Jira tickets.
 ```
 
 After asking this, STOP and wait for the user's answer.
@@ -131,7 +138,7 @@ If the user's current language is Spanish, use this localized shape:
 
 ```text
 Antes de continuar con SDD, elegí una opción por grupo.
-Respondé con "usar recomendado" o con códigos como: A1, B1, C1, D1.
+Respondé con "usar recomendado" o con códigos como: A1, B1, C1, D1, E1.
 
 A. Ritmo
    A1 Interactivo (recomendado): mostrar cada fase y esperar confirmación antes de continuar.
@@ -152,6 +159,12 @@ D. Revisión
    D1 400 líneas (recomendado): frenar si la estimación supera 400 líneas cambiadas.
    D2 800 líneas: más permisivo; útil para cambios medianos.
    D3 Otro: preguntar el número después.
+
+E. Seguimiento
+   E1 Ninguno (recomendado): sin integración de tickets.
+   E2 GitHub: crear/actualizar issues en GitHub.
+   E3 Jira: crear/actualizar tickets en Jira.
+   E4 Ambos: issues en GitHub y tickets en Jira.
 ```
 
 Map answers to canonical values:
@@ -160,13 +173,14 @@ Map answers to canonical values:
 - Artifacts: B1/OpenSpec -> `openspec`; B2/Engram -> `engram`; B3/Both -> `both`.
 - PRs: C1/Ask me -> `ask-always`; C2/Single PR -> `single-pr-default`; C3/Chained -> `force-chained`; C4/Auto -> `auto-forecast`.
 - Review: D1/400 lines -> `review_budget_lines: 400`; D2/800 lines -> `review_budget_lines: 800`; D3/Other -> ask one follow-up for the number.
+- Issue Tracking: E1/None -> `issue_tracking: none`; E2/GitHub -> `issue_tracking: github`; E3/Jira -> `issue_tracking: jira`; E4/Both -> `issue_tracking: both`.
 
 Hard gate rules:
 
 - `openspec/config.yaml`, existing SDD artifacts, previous `sdd-init` results, or installed SDD assets do NOT satisfy session preflight.
 - If the session has no preflight block, ask the localized user-facing preflight prompt above and STOP. Do not run init, delegate phases, edit files, or apply tasks in the same turn.
 - Cache the choices for this session and include them in later phase prompts.
-- If the user explicitly provided all four choices in the current conversation, summarize them as the session preflight block and continue.
+- If the user explicitly provided all five choices in the current conversation, summarize them as the session preflight block and continue.
 
 ### SDD Entry Routing (MANDATORY)
 
@@ -275,6 +289,21 @@ If it says `Chained PRs recommended: Yes`, `400-line budget risk: High`, estimat
 Do this even in Automatic mode. Automatic mode does not override reviewer burnout protection.
 
 When launching `sdd-apply`, always include the resolved `delivery_strategy`, `chain_strategy`, and any chosen PR boundary/exception in the prompt.
+
+### Issue Tracking Routing (MANDATORY)
+
+After session preflight, cache the resolved `issue_tracking` value and pass it to relevant phases.
+
+| `issue_tracking` | Action |
+| ---------------- | ------ |
+| `none`           | No ticket integration. Skip all `sdd-po` invocations. |
+| `github`         | Before `sdd-propose`: delegate `sdd-po` with mode `analyze-ticket` (if a GitHub issue number was provided). After `sdd-apply`: delegate `sdd-po` with mode `post-apply-report`. After `sdd-archive`: delegate `sdd-po` with mode `lifecycle-update`. |
+| `jira`           | Before `sdd-propose`: delegate `sdd-po` with mode `analyze-ticket` (if a Jira ticket key was provided). After `sdd-apply`: delegate `sdd-po` with mode `post-apply-report`. After `sdd-archive`: delegate `sdd-po` with mode `lifecycle-update`. |
+| `both`           | Same as `jira` + `github`: run `analyze-ticket` for both if keys were provided; run `post-apply-report` for both after apply; run `lifecycle-update` for both after archive. |
+
+Always pass `issue_tracking` as a named parameter in the `sdd-po` prompt.
+
+If no ticket key was provided by the user, skip `analyze-ticket` silently — do NOT ask for a ticket key unless the user's request implied one.
 
 <!-- gentle-ai:sdd-model-assignments -->
 

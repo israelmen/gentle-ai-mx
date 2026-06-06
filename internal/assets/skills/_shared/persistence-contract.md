@@ -101,6 +101,7 @@ Do NOT return without saving what you learned. This is how the team builds persi
 SDD (with dependencies):
 ```
 Artifact store mode: {engram|openspec|hybrid|none}
+Issue tracking: {none|github|jira|both}
 Read these artifacts before starting (search returns truncated previews):
   mem_search(query: "sdd/{change-name}/{type}", project: "{project}") → get ID
   mem_get_observation(id: {id}) → full content (REQUIRED)
@@ -121,6 +122,7 @@ If you return without calling mem_save, the next phase CANNOT find your artifact
 SDD (no dependencies):
 ```
 Artifact store mode: {engram|openspec|hybrid|none}
+Issue tracking: {none|github|jira|both}
 
 PERSISTENCE (MANDATORY — do NOT skip):
 After completing your work, you MUST call:
